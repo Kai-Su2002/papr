@@ -1,0 +1,124 @@
+//! Domain types shared between the database layer, ingestion, and the frontend.
+//! All structs use camelCase when serialized so the React side stays idiomatic.
+
+use serde::{Deserialize, Serialize};
+
+/// The kind of source a feed represents. Drives differentiated rendering in the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceType {
+    Rss,
+    Youtube,
+    Podcast,
+    Mastodon,
+    Bluesky,
+}
+
+impl SourceType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SourceType::Rss => "rss",
+            SourceType::Youtube => "youtube",
+            SourceType::Podcast => "podcast",
+            SourceType::Mastodon => "mastodon",
+            SourceType::Bluesky => "bluesky",
+        }
+    }
+
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Folder {
+    pub id: i64,
+    pub name: String,
+    pub position: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Feed {
+    pub id: i64,
+    pub feed_url: String,
+    pub site_url: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    pub favicon_url: Option<String>,
+    pub folder_id: Option<i64>,
+    pub source_type: String,
+    pub last_fetched_at: Option<String>,
+    pub fetch_error: Option<String>,
+    pub unread_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Enclosure {
+    pub url: String,
+    pub mime_type: Option<String>,
+    pub length: Option<i64>,
+}
+
+/// A row in the article list pane. Keeps the payload small (no full HTML body).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArticleSummary {
+    pub id: i64,
+    pub feed_id: i64,
+    pub feed_title: String,
+    pub source_type: String,
+    pub title: String,
+    pub author: Option<String>,
+    pub snippet: Option<String>,
+    pub image_url: Option<String>,
+    pub url: Option<String>,
+    pub published_at: Option<String>,
+    pub is_read: bool,
+    pub is_starred: bool,
+    pub read_later: bool,
+}
+
+/// The full article shown in the reading pane.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArticleDetail {
+    pub id: i64,
+    pub feed_id: i64,
+    pub feed_title: String,
+    pub source_type: String,
+    pub title: String,
+    pub author: Option<String>,
+    pub url: Option<String>,
+    /// Sanitized HTML from the feed itself.
+    pub content_html: Option<String>,
+    /// Sanitized HTML from full-text extraction (dom_smoothie), if performed.
+    pub extracted_html: Option<String>,
+    pub image_url: Option<String>,
+    pub published_at: Option<String>,
+    pub is_read: bool,
+    pub is_starred: bool,
+    pub read_later: bool,
+    pub ai_summary: Option<String>,
+    pub enclosures: Vec<Enclosure>,
+}
+
+/// Filters for the article list. Mirrors the sidebar selection in the UI.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "value")]
+pub enum ArticleQuery {
+    All,
+    Unread,
+    Starred,
+    ReadLater,
+    Feed(i64),
+    Folder(i64),
+}
+
+/// Live progress for a refresh run, streamed to the frontend over an ipc::Channel.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "event", content = "data")]
+pub enum RefreshProgress {
+    Started { total: usize },
+    FeedDone { feed_id: i64, new_articles: usize, error: Option<String> },
+    Finished { new_articles: usize },
+}
