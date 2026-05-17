@@ -1215,6 +1215,11 @@ button { font-family: inherit; }
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
+/* `outline: 0` above drops the UA focus ring — restore a visible one on the
+   thumb for keyboard users. */
+.s-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 0 0 3px var(--accent-soft);
+}
 .s-value {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -1269,6 +1274,11 @@ button { font-family: inherit; }
   outline-color: var(--ink-2);
   outline-width: 1.5px;
   outline-offset: 2px;
+}
+/* The swatch uses `outline` for its own border, which would suppress the UA
+   focus ring — give keyboard focus a distinct box-shadow halo instead. */
+.s-swatch:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 /* Button */

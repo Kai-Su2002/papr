@@ -515,6 +515,8 @@ function AppearanceSection() {
                 style={{ background: a.color }}
                 onClick={() => setAccent(a.value)}
                 title={a.label}
+                aria-label={a.label}
+                aria-pressed={accent === a.value}
               />
             ))}
           </div>
