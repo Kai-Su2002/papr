@@ -201,12 +201,7 @@ pub async fn get_article(state: State<'_, AppState>, id: i64) -> AppResult<Artic
 
 /// Queue a read/starred change for FreshRSS, but only when a server is linked.
 fn enqueue_if_connected(conn: &rusqlite::Connection, id: i64, field: &str, value: bool) {
-    let connected = db::get_setting(conn, "freshrss_url")
-        .ok()
-        .flatten()
-        .map(|u| !u.trim().is_empty())
-        .unwrap_or(false);
-    if connected {
+    if db::is_freshrss_connected(conn) {
         let _ = db::enqueue_sync(conn, id, field, value);
     }
 }
@@ -243,7 +238,7 @@ pub async fn mark_all_read(app: AppHandle, query: ArticleQuery) -> AppResult<usi
     let n = {
         let state = app.state::<AppState>();
         let conn = state.db.lock().await;
-        db::mark_all_read(&conn, &query)?
+        db::mark_all_read(&conn, &query, db::is_freshrss_connected(&conn))?
     };
     let _ = app.emit("feeds-updated", 0);
     crate::notify::update_badge(&app).await;

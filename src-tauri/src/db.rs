@@ -697,32 +697,62 @@ pub fn set_ai_summary(conn: &Connection, id: i64, summary: &str) -> AppResult<()
     Ok(())
 }
 
-/// Mark every article matching the current sidebar selection as read.
-pub fn mark_all_read(conn: &Connection, query: &ArticleQuery) -> AppResult<usize> {
-    let n = match query {
-        ArticleQuery::All | ArticleQuery::Unread => {
-            conn.execute("UPDATE articles SET is_read = 1 WHERE is_read = 0", [])?
-        }
-        ArticleQuery::Starred => conn
-            .execute("UPDATE articles SET is_read = 1 WHERE is_starred = 1 AND is_read = 0", [])?,
-        ArticleQuery::ReadLater => conn
-            .execute("UPDATE articles SET is_read = 1 WHERE read_later = 1 AND is_read = 0", [])?,
-        ArticleQuery::Feed(id) => conn.execute(
-            "UPDATE articles SET is_read = 1 WHERE feed_id = ?1 AND is_read = 0",
-            params![id],
-        )?,
-        ArticleQuery::Folder(id) => conn.execute(
-            "UPDATE articles SET is_read = 1 WHERE is_read = 0 AND feed_id IN
-                (SELECT id FROM feeds WHERE folder_id = ?1)",
-            params![id],
-        )?,
-        ArticleQuery::Tag(id) => conn.execute(
-            "UPDATE articles SET is_read = 1 WHERE is_read = 0 AND id IN
-                (SELECT article_id FROM article_tags WHERE tag_id = ?1)",
-            params![id],
-        )?,
+/// Mark every article matching the current sidebar selection as read. When
+/// `enqueue_sync` is set, the read change is also queued for the sync server
+/// — otherwise a bulk mark-all-read never reaches FreshRSS and the next pull
+/// silently reverts it.
+pub fn mark_all_read(
+    conn: &Connection,
+    query: &ArticleQuery,
+    enqueue_sync: bool,
+) -> AppResult<usize> {
+    // WHERE fragment selecting the articles in the current view, plus an
+    // optional bound id (feed / folder / tag). `pred` is a fixed literal.
+    let (pred, id): (&str, Option<i64>) = match query {
+        ArticleQuery::All | ArticleQuery::Unread => ("1", None),
+        ArticleQuery::Starred => ("is_starred = 1", None),
+        ArticleQuery::ReadLater => ("read_later = 1", None),
+        ArticleQuery::Feed(id) => ("feed_id = ?1", Some(*id)),
+        ArticleQuery::Folder(id) => (
+            "feed_id IN (SELECT id FROM feeds WHERE folder_id = ?1)",
+            Some(*id),
+        ),
+        ArticleQuery::Tag(id) => (
+            "id IN (SELECT article_id FROM article_tags WHERE tag_id = ?1)",
+            Some(*id),
+        ),
     };
+    let bind: Vec<&dyn rusqlite::ToSql> =
+        id.iter().map(|v| v as &dyn rusqlite::ToSql).collect();
+
+    // Queue the read change *before* flipping is_read, so `is_read = 0` still
+    // matches the affected set. Only articles the server knows (remote_id
+    // set) are pushable. The SELECT's WHERE also disambiguates ON CONFLICT.
+    if enqueue_sync {
+        conn.execute(
+            &format!(
+                "INSERT INTO sync_queue(article_id, field, value)
+                 SELECT id, 'read', 1 FROM articles
+                 WHERE {pred} AND is_read = 0 AND remote_id IS NOT NULL
+                 ON CONFLICT(article_id, field) DO UPDATE SET value = 1"
+            ),
+            bind.as_slice(),
+        )?;
+    }
+    let n = conn.execute(
+        &format!("UPDATE articles SET is_read = 1 WHERE {pred} AND is_read = 0"),
+        bind.as_slice(),
+    )?;
     Ok(n)
+}
+
+/// Whether a FreshRSS server is currently linked (a non-empty URL is stored).
+pub fn is_freshrss_connected(conn: &Connection) -> bool {
+    get_setting(conn, "freshrss_url")
+        .ok()
+        .flatten()
+        .map(|u| !u.trim().is_empty())
+        .unwrap_or(false)
 }
 
 // ─────────────────────────── tags ───────────────────────────
