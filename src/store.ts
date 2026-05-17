@@ -26,9 +26,21 @@ export interface Prefs {
 
 const ls = {
   get: (k: string, fallback: string) => localStorage.getItem(k) ?? fallback,
+  /** A persisted enum value, validated against `allowed` — a corrupt or
+   *  stale value falls back instead of flowing through an unchecked cast. */
+  oneOf: <T extends string>(k: string, allowed: readonly T[], fallback: T): T => {
+    const v = localStorage.getItem(k);
+    return v != null && (allowed as readonly string[]).includes(v)
+      ? (v as T)
+      : fallback;
+  },
   num: (k: string, fallback: number) => {
     const v = localStorage.getItem(k);
-    return v == null ? fallback : Number(v);
+    if (v == null) return fallback;
+    const n = Number(v);
+    // Guard against a corrupt non-numeric value — NaN would otherwise reach
+    // a CSS variable (e.g. `--reader-size: NaNpx`) and break the layout.
+    return Number.isFinite(n) ? n : fallback;
   },
   bool: (k: string, fallback: boolean) => {
     const v = localStorage.getItem(k);
@@ -107,7 +119,11 @@ function loadPrefs(): Prefs {
     showReadingTime: ls.bool("pref.showReadingTime", true),
     markReadOnOpen: ls.bool("pref.markReadOnOpen", true),
     markReadOnScroll: ls.bool("pref.markReadOnScroll", false),
-    startupView: ls.get("pref.startupView", "unread") as StartupView,
+    startupView: ls.oneOf<StartupView>(
+      "pref.startupView",
+      ["all", "unread", "starred", "last"],
+      "unread",
+    ),
     hideReadOnStartup: ls.bool("pref.hideReadOnStartup", false),
   };
 }
@@ -120,10 +136,14 @@ export const useUi = create<UiState>((set) => ({
   sortOldest: false,
   search: "",
 
-  theme: ls.get("theme", "light") as Theme,
-  accent: ls.get("accent", "clay") as Accent,
-  density: ls.get("density", "cozy") as Density,
-  viewMode: ls.get("viewMode", "list") as ViewMode,
+  theme: ls.oneOf<Theme>("theme", ["light", "dark"], "light"),
+  accent: ls.oneOf<Accent>("accent", ["clay", "pine", "indigo", "ink"], "clay"),
+  density: ls.oneOf<Density>(
+    "density",
+    ["compact", "cozy", "spacious"],
+    "cozy",
+  ),
+  viewMode: ls.oneOf<ViewMode>("viewMode", ["list", "card"], "list"),
   useSerif: ls.bool("useSerif", true),
   readerSize: ls.num("readerSize", 17),
   readerLeading: ls.num("readerLeading", 165),
