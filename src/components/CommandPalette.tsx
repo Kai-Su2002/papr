@@ -182,8 +182,10 @@ export default function CommandPalette({
     const list = items.filter((i) => i.group === key);
     if (list.length === 0) return null;
     return (
-      <div key={key}>
-        <div className="cp-group-title">{title}</div>
+      <div key={key} role="group" aria-label={title}>
+        <div className="cp-group-title" aria-hidden="true">
+          {title}
+        </div>
         {list.map((it) => {
           flat++;
           const idx = flat;
@@ -191,6 +193,9 @@ export default function CommandPalette({
             <div
               key={it.id}
               data-cp-index={idx}
+              id={`cp-option-${idx}`}
+              role="option"
+              aria-selected={idx === active}
               className={`cp-item ${idx === active ? "active" : ""}`}
               onMouseEnter={() => setActive(idx)}
               onClick={() => run(it)}
@@ -226,10 +231,17 @@ export default function CommandPalette({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey}
             placeholder={t("commandPalette.searchPlaceholder")}
+            role="combobox"
+            aria-expanded={items.length > 0}
+            aria-controls="cp-listbox"
+            aria-activedescendant={
+              items.length > 0 ? `cp-option-${active}` : undefined
+            }
+            aria-autocomplete="list"
           />
           <span className="cp-esc">ESC</span>
         </div>
-        <div className="cp-list" ref={listRef}>
+        <div className="cp-list" id="cp-listbox" role="listbox" ref={listRef}>
           {items.length === 0 ? (
             <div className="cp-empty">
               {articleResults.isFetching
