@@ -493,6 +493,11 @@ button { font-family: inherit; }
 .tb-btn:hover { background: var(--hover); color: var(--ink); }
 .tb-btn.on { color: var(--accent); background: var(--accent-soft); }
 .tb-btn.spacer { flex: 1; pointer-events: none; }
+/* Dim a genuinely unavailable button — but not the busy/`spinning` extract
+   button, which stays fully visible while it works. */
+.tb-btn:disabled { cursor: default; }
+.tb-btn:disabled:not(.spinning) { opacity: 0.35; }
+.tb-btn:disabled:hover { background: none; color: var(--muted); }
 
 .reader-scroll {
   flex: 1;

@@ -287,6 +287,7 @@ export default function Reader({ onToast }: Props) {
           title={t("reader.tbCopyLink")}
           aria-label={t("reader.tbCopyLink")}
           onClick={copyLink}
+          disabled={!a.url}
         >
           <Icon name="copy" size={16} />
         </button>
@@ -295,6 +296,7 @@ export default function Reader({ onToast }: Props) {
           title={t("reader.tbShare")}
           aria-label={t("reader.tbShare")}
           onClick={share}
+          disabled={!a.url}
         >
           <Icon name="share" size={16} />
         </button>
