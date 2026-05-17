@@ -102,6 +102,7 @@
   "reader": {
     "fullTextExtracted": "已提取全文",
     "linkCopied": "链接已复制",
+    "loadError": "无法加载这篇文章",
     "emptySelectArticle": "选择一篇文章开始阅读",
     "emptyHintPrefix": "按",
     "emptyHintSuffix": "上下切换",

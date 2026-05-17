@@ -129,7 +129,14 @@ export default function Reader({ onToast }: Props) {
     else copyLink();
   };
 
-  if (id == null || !a) {
+  if (id == null) {
+    const kbd = {
+      fontFamily: "var(--mono)",
+      fontSize: 10,
+      padding: "1px 5px",
+      border: "1px solid var(--hair)",
+      borderRadius: 3,
+    };
     return (
       <div className="reader">
         <div className="reader-toolbar" data-tauri-drag-region />
@@ -139,33 +146,58 @@ export default function Reader({ onToast }: Props) {
           </div>
           <div>{t("reader.emptySelectArticle")}</div>
           <div style={{ fontSize: 11.5, color: "var(--muted-2)" }}>
-            {t("reader.emptyHintPrefix")}{" "}
-            <kbd
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                padding: "1px 5px",
-                border: "1px solid var(--hair)",
-                borderRadius: 3,
-              }}
-            >
-              J
-            </kbd>{" "}
-            /{" "}
-            <kbd
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10,
-                padding: "1px 5px",
-                border: "1px solid var(--hair)",
-                borderRadius: 3,
-              }}
-            >
-              K
-            </kbd>{" "}
-            {t("reader.emptyHintSuffix")}
+            {t("reader.emptyHintPrefix")} <kbd style={kbd}>J</kbd> /{" "}
+            <kbd style={kbd}>K</kbd> {t("reader.emptyHintSuffix")}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // An article is selected but its detail isn't loaded yet — still fetching
+  // or the fetch failed. Surface that explicitly instead of falling through
+  // to the "select an article" empty state, which would be misleading.
+  if (!a) {
+    return (
+      <div className="reader">
+        <div className="reader-toolbar" data-tauri-drag-region />
+        {article.isError ? (
+          <div className="empty" style={{ flex: 1 }}>
+            <div className="glyph">
+              <Icon name="alert" size={22} />
+            </div>
+            <div>{t("reader.loadError")}</div>
+            <button
+              className="empty-retry"
+              onClick={() => article.refetch()}
+              disabled={article.isFetching}
+            >
+              <Icon name="refresh" size={12} />
+              {t("common.retry")}
+            </button>
+          </div>
+        ) : (
+          <div className="reader-scroll">
+            <div className="article reader-content" aria-hidden="true">
+              <div className="sk-line" style={{ width: "28%" }} />
+              <div
+                className="sk-line"
+                style={{ width: "82%", height: 24, marginBottom: 18 }}
+              />
+              <div
+                className="sk-line"
+                style={{ width: "44%", marginBottom: 30 }}
+              />
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="sk-line"
+                  style={{ width: i % 3 === 2 ? "58%" : "100%", height: 12 }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
