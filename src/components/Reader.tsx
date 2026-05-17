@@ -137,8 +137,15 @@ export default function Reader({ onToast }: Props) {
   };
   const share = () => {
     if (!a?.url) return;
-    if (navigator.share) navigator.share({ title: a.title, url: a.url }).catch(() => {});
-    else copyLink();
+    if (navigator.share) {
+      navigator.share({ title: a.title, url: a.url }).catch((e) => {
+        // A user-cancelled share rejects with AbortError — only fall back to
+        // copying the link on a genuine failure (e.g. share unsupported).
+        if ((e as Error)?.name !== "AbortError") copyLink();
+      });
+    } else {
+      copyLink();
+    }
   };
 
   if (id == null) {
