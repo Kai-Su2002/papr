@@ -9,7 +9,13 @@ export type MenuEntry =
       danger?: boolean;
       onClick: () => void;
     }
-  | { separator: true };
+  | { separator: true }
+  | {
+      /** A row of colour swatches — for picking a tag colour. */
+      swatches: { value: string; color: string }[];
+      current: string;
+      onPick: (value: string) => void;
+    };
 
 interface Props {
   x: number;
@@ -94,6 +100,24 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
       {items.map((it, i) =>
         "separator" in it ? (
           <div key={i} className="ctx-sep" role="separator" />
+        ) : "swatches" in it ? (
+          <div key={i} className="ctx-swatches">
+            {it.swatches.map((sw) => (
+              <button
+                key={sw.value}
+                className={`ctx-swatch ${sw.value === it.current ? "on" : ""}`}
+                role="menuitem"
+                tabIndex={-1}
+                style={{ background: sw.color }}
+                aria-label={sw.value}
+                aria-pressed={sw.value === it.current}
+                onClick={() => {
+                  it.onPick(sw.value);
+                  onClose();
+                }}
+              />
+            ))}
+          </div>
         ) : (
           <div
             key={i}

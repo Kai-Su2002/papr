@@ -5,7 +5,7 @@ import * as api from "../api";
 import { useUi } from "../store";
 import { useArticleActions } from "../hooks/articleActions";
 import { errorText } from "../lib/errors";
-import { tagColor } from "../lib/tagColors";
+import { tagColor, TAG_PALETTE } from "../lib/tagColors";
 import type { ArticleQuery, Feed, Folder, Tag } from "../types";
 import Icon, { type IconName } from "./Icon";
 import ContextMenu, { type MenuEntry } from "./ContextMenu";
@@ -248,6 +248,20 @@ export default function Sidebar({
           onSubmit: (v) =>
             guard(api.renameTag(tag.id, v), t("sidebar.toastRenamed")),
         }),
+    },
+    {
+      swatches: Object.entries(TAG_PALETTE).map(([value, color]) => ({
+        value,
+        color,
+      })),
+      current: tag.color,
+      // The recolour is instantly visible on the dot, so no toast — just
+      // refresh the caches that embed the tag colour.
+      onPick: (color) =>
+        api
+          .setTagColor(tag.id, color)
+          .then(() => actions.refreshAfterBulk())
+          .catch((e) => onToast(errorText(e))),
     },
     { separator: true },
     {
