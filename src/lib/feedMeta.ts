@@ -54,7 +54,14 @@ export function relTime(iso: string | null): string {
   if (mins < 60) return `${Math.floor(mins)}m`;
   if (mins < 1440) return `${Math.floor(mins / 60)}h`;
   if (mins < 1440 * 7) return `${Math.floor(mins / 1440)}d`;
-  return d.toLocaleDateString(dateLocale(), { month: "long", day: "numeric" });
+  // Beyond a week, show the calendar date — with the year for anything not
+  // from the current year, so an archived article isn't ambiguously dated.
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(dateLocale(), {
+    month: "long",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
 }
 
 /** Long-form publication date for the reader byline. */
