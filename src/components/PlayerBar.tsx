@@ -32,6 +32,7 @@ export default function PlayerBar() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   // Load a new src and reset the timeline when the track changes.
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PlayerBar() {
     el.load();
     setTime(0);
     setDuration(0);
+    setFailed(false);
   }, [track?.src]);
 
   // Reflect play/pause intent onto the element.
@@ -77,6 +79,12 @@ export default function PlayerBar() {
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onEnded={() => setPlaying(false)}
+        onError={() => {
+          // A bad enclosure URL or unsupported codec would otherwise leave
+          // the bar stuck at 0:00 with no hint of what went wrong.
+          setFailed(true);
+          setPlaying(false);
+        }}
         preload="metadata"
       />
 
@@ -100,6 +108,7 @@ export default function PlayerBar() {
           className="player-btn"
           onClick={() => nudge(-15)}
           title={t("player.back15")}
+          disabled={failed}
         >
           <Icon name="skip-back" size={15} />
         </button>
@@ -107,6 +116,7 @@ export default function PlayerBar() {
           className="player-btn play"
           onClick={toggle}
           title={playing ? t("player.pause") : t("player.play")}
+          disabled={failed}
         >
           <Icon name={playing ? "pause" : "play"} size={15} />
         </button>
@@ -114,22 +124,32 @@ export default function PlayerBar() {
           className="player-btn"
           onClick={() => nudge(30)}
           title={t("player.fwd30")}
+          disabled={failed}
         >
           <Icon name="skip-fwd" size={15} />
         </button>
       </div>
 
-      <span className="player-time">{clock(time)}</span>
-      <input
-        className="player-scrub"
-        type="range"
-        min={0}
-        max={duration || 0}
-        step={1}
-        value={Math.min(time, duration || 0)}
-        onChange={(e) => seek(Number(e.target.value))}
-      />
-      <span className="player-time">{clock(duration)}</span>
+      {failed ? (
+        <span className="player-error">
+          <Icon name="alert" size={13} />
+          {t("player.loadError")}
+        </span>
+      ) : (
+        <>
+          <span className="player-time">{clock(time)}</span>
+          <input
+            className="player-scrub"
+            type="range"
+            min={0}
+            max={duration || 0}
+            step={1}
+            value={Math.min(time, duration || 0)}
+            onChange={(e) => seek(Number(e.target.value))}
+          />
+          <span className="player-time">{clock(duration)}</span>
+        </>
+      )}
 
       <button
         className="player-btn rate"
