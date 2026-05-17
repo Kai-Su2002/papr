@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -22,6 +22,19 @@ export default function PromptDialog({
   const { t } = useTranslation();
   const [value, setValue] = useState(initialValue);
 
+  // Escape must close the dialog regardless of which control has focus —
+  // an input-level handler dies as soon as the user tabs to a button.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
   const submit = () => {
     const v = value.trim();
     if (!v) return;
@@ -41,7 +54,6 @@ export default function PromptDialog({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
-            if (e.key === "Escape") onClose();
           }}
           style={{ marginTop: 8 }}
         />

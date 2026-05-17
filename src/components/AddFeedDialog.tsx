@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as api from "../api";
 import { useArticleActions } from "../hooks/articleActions";
@@ -34,6 +34,18 @@ export default function AddFeedDialog({ onClose, onToast }: Props) {
     if (url.trim() && !add.isPending) add.mutate();
   };
 
+  // Escape closes the dialog from anywhere inside it, not just the input.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -48,7 +60,6 @@ export default function AddFeedDialog({ onClose, onToast }: Props) {
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
-            if (e.key === "Escape") onClose();
           }}
         />
         {(folders.data?.length ?? 0) > 0 && (
