@@ -148,7 +148,7 @@ export default function App() {
         .finally(() => setRefreshing(false));
       return true;
     });
-  }, [qc, showToast]);
+  }, [qc, showToast, t]);
 
   const markAllRead = useCallback(async () => {
     try {
@@ -280,7 +280,8 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [qc, actions, cpOpen, doRefresh, markAllRead, showToast]);
+    // `t` is listed so the shortcut toasts re-bind after a language change.
+  }, [qc, actions, cpOpen, doRefresh, markAllRead, showToast, t]);
 
   return (
     <>
