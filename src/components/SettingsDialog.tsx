@@ -1403,16 +1403,19 @@ function AiSettingsGroup({ onToast }: { onToast: (m: string) => void }) {
   const [provider, setProvider] = useState<"anthropic" | "openai">("anthropic");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
   const savedKey = useRef("");
   const savedModel = useRef("");
+  const savedBaseUrl = useRef("");
 
   useEffect(() => {
     Promise.all([
       api.getSetting("ai_provider"),
       api.getSetting("ai_api_key"),
       api.getSetting("ai_model"),
+      api.getSetting("ai_base_url"),
     ])
-      .then(([p, k, m]) => {
+      .then(([p, k, m, b]) => {
         if (p === "openai" || p === "anthropic") setProvider(p);
         if (k) {
           setApiKey(k);
@@ -1421,6 +1424,10 @@ function AiSettingsGroup({ onToast }: { onToast: (m: string) => void }) {
         if (m) {
           setModel(m);
           savedModel.current = m;
+        }
+        if (b) {
+          setBaseUrl(b);
+          savedBaseUrl.current = b;
         }
       })
       .catch(() => {});
@@ -1438,6 +1445,11 @@ function AiSettingsGroup({ onToast }: { onToast: (m: string) => void }) {
       ? t("settings.advanced.aiModelPlaceholderOpenai")
       : t("settings.advanced.aiModelPlaceholderAnthropic");
 
+  const baseUrlPlaceholder =
+    provider === "openai"
+      ? "https://api.openai.com/v1"
+      : "https://api.anthropic.com/v1";
+
   return (
     <div className="settings-group">
       <h3 className="settings-group-title">{t("settings.advanced.aiSummary")}</h3>
@@ -1453,14 +1465,17 @@ function AiSettingsGroup({ onToast }: { onToast: (m: string) => void }) {
           ]}
           onChange={(v) => {
             setProvider(v);
-            // A model name is provider-specific — carrying the old one over
-            // would send e.g. an OpenAI model to Anthropic. Clear it so the
-            // backend falls back to the new provider's default.
+            // The model name and base URL are provider-specific — carrying
+            // them over would send e.g. an OpenAI model to Anthropic. Clear
+            // both so the backend falls back to the new provider's defaults.
             setModel("");
             savedModel.current = "";
+            setBaseUrl("");
+            savedBaseUrl.current = "";
             Promise.all([
               api.setSetting("ai_provider", v),
               api.setSetting("ai_model", ""),
+              api.setSetting("ai_base_url", ""),
             ])
               .then(() =>
                 onToast(
@@ -1505,6 +1520,26 @@ function AiSettingsGroup({ onToast }: { onToast: (m: string) => void }) {
             if (model !== savedModel.current) {
               savedModel.current = model;
               save("ai_model", model, t("settings.advanced.aiModelLabel"));
+            }
+          }}
+        />
+      </Row>
+      <Row
+        label={t("settings.advanced.aiBaseUrl")}
+        desc={t("settings.advanced.aiBaseUrlDesc")}
+      >
+        <input
+          className="s-text-input"
+          type="text"
+          value={baseUrl}
+          placeholder={baseUrlPlaceholder}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          onBlur={() => {
+            const trimmed = baseUrl.trim();
+            if (trimmed !== baseUrl) setBaseUrl(trimmed);
+            if (trimmed !== savedBaseUrl.current) {
+              savedBaseUrl.current = trimmed;
+              save("ai_base_url", trimmed, t("settings.advanced.aiBaseUrlLabel"));
             }
           }}
         />

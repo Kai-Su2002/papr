@@ -384,6 +384,9 @@
       "aiModelLabel": "AI 模型",
       "aiModelPlaceholderOpenai": "gpt-4.1-mini（默认）",
       "aiModelPlaceholderAnthropic": "claude-sonnet-4-6（默认）",
+      "aiBaseUrl": "Base URL",
+      "aiBaseUrlDesc": "API 端点根地址。留空则使用官方端点，也可指向任意兼容服务商（OpenRouter、Groq、DeepSeek、本地服务等）",
+      "aiBaseUrlLabel": "Base URL",
       "aiSaved": "{{label}}已保存"
     },
     "about": {

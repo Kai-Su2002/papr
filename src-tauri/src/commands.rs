@@ -372,6 +372,7 @@ fn load_ai_config(conn: &rusqlite::Connection) -> AppResult<AiConfig> {
         db::get_setting(conn, "ai_provider")?,
         db::get_setting(conn, "ai_api_key")?,
         db::get_setting(conn, "ai_model")?,
+        db::get_setting(conn, "ai_base_url")?,
     )
 }
 

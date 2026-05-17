@@ -38,11 +38,21 @@ pub struct AiConfig {
     provider: Provider,
     api_key: String,
     model: String,
+    /// API root, without a trailing slash — the per-provider request path
+    /// (`/messages`, `/chat/completions`) is appended to it. Defaults to the
+    /// official endpoint; an override points at any compatible provider
+    /// (OpenRouter, Groq, DeepSeek, a local server, …).
+    base_url: String,
 }
 
 impl AiConfig {
-    /// Build a config from raw settings, applying per-provider model defaults.
-    pub fn new(provider: Option<String>, api_key: Option<String>, model: Option<String>) -> AppResult<Self> {
+    /// Build a config from raw settings, applying per-provider defaults.
+    pub fn new(
+        provider: Option<String>,
+        api_key: Option<String>,
+        model: Option<String>,
+        base_url: Option<String>,
+    ) -> AppResult<Self> {
         let api_key = api_key
             .filter(|k| !k.trim().is_empty())
             .ok_or_else(|| AppError::code("noAiKey"))?;
@@ -56,11 +66,27 @@ impl AiConfig {
                 Provider::OpenAi => "gpt-4.1-mini".to_string(),
             }
         });
+        let base_url = base_url
+            .map(|u| u.trim().trim_end_matches('/').to_string())
+            .filter(|u| !u.is_empty())
+            .unwrap_or_else(|| provider.default_base_url().to_string());
         Ok(AiConfig {
             provider,
             api_key,
             model,
+            base_url,
         })
+    }
+}
+
+impl Provider {
+    /// The official API root for this provider, used when the user has not
+    /// set a custom base URL.
+    fn default_base_url(self) -> &'static str {
+        match self {
+            Provider::Anthropic => "https://api.anthropic.com/v1",
+            Provider::OpenAi => "https://api.openai.com/v1",
+        }
     }
 }
 
@@ -103,7 +129,7 @@ async fn stream_anthropic(
         "messages": [{ "role": "user", "content": user }],
     });
     let resp = client
-        .post("https://api.anthropic.com/v1/messages")
+        .post(format!("{}/messages", cfg.base_url))
         .header("x-api-key", &cfg.api_key)
         .header("anthropic-version", "2023-06-01")
         .header("content-type", "application/json")
@@ -131,7 +157,7 @@ async fn stream_openai(
         ],
     });
     let resp = client
-        .post("https://api.openai.com/v1/chat/completions")
+        .post(format!("{}/chat/completions", cfg.base_url))
         .bearer_auth(&cfg.api_key)
         .timeout(AI_REQUEST_TIMEOUT)
         .json(&body)
