@@ -14,6 +14,10 @@ use tauri::ipc::Channel;
 /// requests override it with a generous bound.
 const AI_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 
+/// Output token cap, applied to every provider so a response stays bounded in
+/// length and cost. Summaries / Q&A / digests all fit comfortably within it.
+const MAX_TOKENS: u32 = 1024;
+
 /// Token-level events streamed to the frontend over an `ipc::Channel`.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase", tag = "type", content = "data")]
@@ -93,7 +97,7 @@ async fn stream_anthropic(
 ) -> AppResult<String> {
     let body = json!({
         "model": cfg.model,
-        "max_tokens": 1024,
+        "max_tokens": MAX_TOKENS,
         "system": system,
         "stream": true,
         "messages": [{ "role": "user", "content": user }],
@@ -119,6 +123,7 @@ async fn stream_openai(
 ) -> AppResult<String> {
     let body = json!({
         "model": cfg.model,
+        "max_tokens": MAX_TOKENS,
         "stream": true,
         "messages": [
             { "role": "system", "content": system },
