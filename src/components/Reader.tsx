@@ -67,7 +67,9 @@ export default function Reader({ onToast }: Props) {
     const chars = html.replace(/<[^>]+>/g, "").length;
     // mixed CJK / latin estimate
     return Math.max(2, Math.round(Math.max(words / 220, chars / 480)));
-  }, [a?.id]);
+    // Recompute when the body changes — including after full-text extraction
+    // replaces the short feed snippet, which keeps the same article id.
+  }, [a?.extractedHtml, a?.contentHtml]);
 
   // Reset scroll + extraction view on article change.
   useEffect(() => {
