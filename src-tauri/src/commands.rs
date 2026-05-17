@@ -621,8 +621,12 @@ pub async fn create_tag(state: State<'_, AppState>, name: String) -> AppResult<i
 
 #[tauri::command]
 pub async fn rename_tag(state: State<'_, AppState>, id: i64, name: String) -> AppResult<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::code("emptyTagName"));
+    }
     let conn = state.db.lock().await;
-    db::rename_tag(&conn, id, name.trim())
+    db::rename_tag(&conn, id, name)
 }
 
 #[tauri::command]
@@ -689,6 +693,9 @@ pub async fn update_rule(
     query: String,
     action: String,
 ) -> AppResult<()> {
+    if query.trim().is_empty() {
+        return Err(AppError::code("emptyRuleQuery"));
+    }
     let conn = state.db.lock().await;
     db::update_rule(&conn, id, name.trim(), enabled, feed_id, &field, query.trim(), &action)
 }
