@@ -337,7 +337,7 @@ export default function Sidebar({
   );
 
   return (
-    <div className="sidebar">
+    <div className="sidebar" role="navigation">
       <div className="titlebar" data-tauri-drag-region />
 
       <div style={{ height: 38 }} />
