@@ -142,6 +142,10 @@ static MIGRATIONS: LazyLock<Migrations> = LazyLock::new(|| {
             "CREATE INDEX idx_articles_sort
              ON articles(COALESCE(published_at, fetched_at) DESC, id DESC);",
         ),
+        // v7 — every date ordering now sorts on the effective date and uses
+        // idx_articles_sort, so the original published_at-only index is dead
+        // weight on each insert. Drop it.
+        M::up("DROP INDEX idx_articles_published;"),
     ])
 });
 
@@ -607,7 +611,7 @@ pub fn digest_source(conn: &Connection, limit: i64) -> AppResult<Vec<(String, St
     let mut stmt = conn.prepare(
         "SELECT a.title, f.title, substr(a.body_text, 1, 600)
          FROM articles a JOIN feeds f ON f.id = a.feed_id
-         ORDER BY a.published_at DESC, a.id DESC LIMIT ?1",
+         ORDER BY COALESCE(a.published_at, a.fetched_at) DESC, a.id DESC LIMIT ?1",
     )?;
     let rows = stmt
         .query_map(params![limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
@@ -954,7 +958,7 @@ pub fn preview_rule(
     )?;
     let mut stmt = conn.prepare(&format!(
         "SELECT a.title FROM articles a WHERE {where_sql}
-         ORDER BY a.published_at DESC, a.id DESC LIMIT 5"
+         ORDER BY COALESCE(a.published_at, a.fetched_at) DESC, a.id DESC LIMIT 5"
     ))?;
     let samples = stmt
         .query_map(params_from_iter(binds), |r| r.get(0))?
