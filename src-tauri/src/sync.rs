@@ -182,12 +182,13 @@ pub async fn disconnect(app: &AppHandle) -> AppResult<()> {
     Ok(())
 }
 
-/// Run a full sync if a server is connected; otherwise a no-op.
-pub async fn run_if_connected(app: &AppHandle) -> AppResult<()> {
+/// Run a full sync if a server is connected. Returns `true` when a sync
+/// actually ran, so the caller can refresh the UI for the reconciled state.
+pub async fn run_if_connected(app: &AppHandle) -> AppResult<bool> {
     if creds(app).await?.is_some() {
-        sync_now(app).await.map(|_| ())
+        sync_now(app).await.map(|_| true)
     } else {
-        Ok(())
+        Ok(false)
     }
 }
 

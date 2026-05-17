@@ -222,8 +222,14 @@ pub async fn refresh_all(
     notify::notify_new_articles(app, total_new).await;
 
     // Reconcile read/starred state with the sync server, if one is connected.
-    if let Err(e) = sync::run_if_connected(app).await {
-        log::warn!("sync failed: {e}");
+    // A sync mutates article state and may add feeds, so emit `feeds-updated`
+    // again afterwards — the first emit fired before the sync touched the DB.
+    match sync::run_if_connected(app).await {
+        Ok(true) => {
+            let _ = app.emit("feeds-updated", 0);
+        }
+        Ok(false) => {}
+        Err(e) => log::warn!("sync failed: {e}"),
     }
 
     notify::update_badge(app).await;
