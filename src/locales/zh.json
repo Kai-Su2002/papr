@@ -76,6 +76,24 @@
     "discoverFromPage": "在此页面发现",
     "discoverAdd": "添加"
   },
+  "explore": {
+    "title": "发现订阅源",
+    "subtitle": "浏览精选的知名订阅源目录。",
+    "feedCount": "{{n}} 个精选订阅源 — 选择分类，然后订阅。",
+    "searchPlaceholder": "搜索目录…",
+    "searchLabel": "搜索订阅源目录",
+    "categories": "分类",
+    "all": "全部",
+    "add": "添加",
+    "adding": "添加中…",
+    "subscribed": "已订阅",
+    "subscribedToast": "已订阅 {{title}}",
+    "loading": "正在加载目录…",
+    "error": "目录加载失败 — 请重试。",
+    "noResults": "没有匹配项 — 换个关键词或分类试试。",
+    "folderLabel": "新订阅归入的文件夹",
+    "noFolder": "不归入文件夹"
+  },
   "app": {
     "refreshing": "正在刷新所有订阅源…",
     "foundNew": "发现 {{count}} 篇新文章",
@@ -493,7 +511,7 @@
     "deleteFolder": "删除文件夹",
     "addFeedShortcut": "添加订阅源 (A)",
     "refreshAll": "刷新所有 (⌘R)",
-    "opmlImportExport": "OPML 导入 / 导出",
+    "explore": "发现订阅源",
     "settings": "设置 (⌘,)",
     "toastMoved": "已移动 {{feed}} → {{folder}}",
     "toastMovedTo": "已移动到 {{folder}}",

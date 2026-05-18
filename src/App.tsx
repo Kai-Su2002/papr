@@ -16,6 +16,7 @@ import Reader from "./components/Reader";
 import CommandPalette, { type CommandAction } from "./components/CommandPalette";
 import SettingsDialog from "./components/SettingsDialog";
 import AddFeedDialog from "./components/AddFeedDialog";
+import ExploreDialog from "./components/ExploreDialog";
 import PromptDialog from "./components/PromptDialog";
 import PlayerBar from "./components/PlayerBar";
 
@@ -41,7 +42,6 @@ export default function App() {
   const theme = useUi((s) => s.theme);
   const accent = useUi((s) => s.accent);
   const density = useUi((s) => s.density);
-  const useSerif = useUi((s) => s.useSerif);
   const readerSize = useUi((s) => s.readerSize);
   const readerLeading = useUi((s) => s.readerLeading);
   const readerWidth = useUi((s) => s.readerWidth);
@@ -57,6 +57,8 @@ export default function App() {
   const [addFeed, setAddFeed] = useState(false);
   // Feed URL handed over by a `papr://subscribe` deep link (browser extension).
   const [addFeedUrl, setAddFeedUrl] = useState<string | undefined>(undefined);
+  // The standalone Explore (curated-directory marketplace) dialog.
+  const [explore, setExplore] = useState(false);
   const [newFolder, setNewFolder] = useState(false);
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -138,7 +140,7 @@ export default function App() {
     root.setProperty("--reader-size", `${readerSize}px`);
     root.setProperty("--reader-leading", String(readerLeading / 100));
     root.setProperty("--reader-width", `${readerWidth}px`);
-  }, [readerSize, readerLeading, readerWidth, useSerif]);
+  }, [readerSize, readerLeading, readerWidth]);
 
   // ── toast ──
   const showToast = useCallback((text: string, kbd?: string) => {
@@ -410,6 +412,7 @@ export default function App() {
         <div className={`window ${focusMode ? "focus" : ""}`}>
           <Sidebar
             onAddFeed={() => setAddFeed(true)}
+            onExplore={() => setExplore(true)}
             onOpenSettings={openSettings}
             onSearchClick={() => setCpOpen(true)}
             onRefresh={doRefresh}
@@ -450,6 +453,13 @@ export default function App() {
           }}
           onToast={showToast}
           initialUrl={addFeedUrl}
+        />
+      )}
+
+      {explore && (
+        <ExploreDialog
+          onClose={() => setExplore(false)}
+          onToast={showToast}
         />
       )}
 

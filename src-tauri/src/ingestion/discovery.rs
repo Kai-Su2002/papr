@@ -28,10 +28,14 @@ pub struct DirectoryEntry {
     pub feed_url: String,
     /// The human-facing website the feed belongs to.
     pub site_url: String,
-    /// Broad category — used to group results in the UI.
+    /// Broad category — used to group results in the UI. Authored in the
+    /// entry's own language, so a directory slice reads natively.
     pub category: String,
     /// One-line description shown under the title.
     pub description: String,
+    /// Primary language of the feed's content (`"en"`, `"zh"`, `"ja"`).
+    /// Explore recommends the slice matching the user's chosen UI language.
+    pub lang: String,
 }
 
 /// A single discovery result, returned to the frontend.
@@ -85,14 +89,38 @@ pub fn directory() -> Vec<DirectoryEntry> {
     serde_json::from_str(DIRECTORY_JSON).expect("bundled feed-directory.json is valid JSON")
 }
 
-/// Case-insensitive search of the curated directory. An empty query returns
-/// the whole directory (so the UI can show a browsable list); otherwise an
-/// entry matches when the query is a substring of its title, category, or
-/// description. Results preserve the directory's authored order.
-pub fn search_directory(query: &str) -> Vec<DiscoveryResult> {
+/// The primary subtag of a BCP-47-ish language tag, lowercased: `"zh-CN"` and
+/// `"ZH"` both reduce to `"zh"`. Used to match a UI locale against the
+/// directory's coarser per-language tags.
+fn primary_lang(tag: &str) -> String {
+    tag.split(['-', '_'])
+        .next()
+        .unwrap_or(tag)
+        .to_lowercase()
+}
+
+/// Case-insensitive search of the curated directory, scoped to one language.
+///
+/// `lang` is matched against each entry's `lang` tag by primary subtag, so a
+/// `"zh-CN"` UI locale selects the `"zh"` slice. When the directory carries no
+/// entry for the requested language the search falls back to English, so
+/// Explore is never empty for a locale we have not curated feeds for yet.
+///
+/// An empty query returns the whole language slice (the UI shows it as a
+/// browsable gallery); otherwise an entry matches when the query is a
+/// substring of its title, category, or description. Results preserve the
+/// directory's authored order.
+pub fn search_directory(query: &str, lang: &str) -> Vec<DiscoveryResult> {
     let needle = query.trim().to_lowercase();
-    directory()
-        .iter()
+    let dir = directory();
+    let want = primary_lang(lang);
+    let want = if dir.iter().any(|e| primary_lang(&e.lang) == want) {
+        want
+    } else {
+        "en".to_string()
+    };
+    dir.iter()
+        .filter(|e| primary_lang(&e.lang) == want)
         .filter(|e| {
             needle.is_empty()
                 || e.title.to_lowercase().contains(&needle)
@@ -202,6 +230,18 @@ mod tests {
             assert!(!e.title.is_empty(), "entry missing title");
             assert!(e.feed_url.starts_with("http"), "bad feed url: {}", e.feed_url);
             assert!(!e.category.is_empty(), "entry missing category: {}", e.title);
+            assert!(!e.lang.is_empty(), "entry missing lang: {}", e.title);
+        }
+    }
+
+    #[test]
+    fn directory_curates_each_supported_language() {
+        // Every UI locale the app ships must have its own curated slice, or
+        // Explore would silently fall back to English for that user.
+        let dir = directory();
+        for lang in ["en", "zh", "ja"] {
+            let n = dir.iter().filter(|e| primary_lang(&e.lang) == lang).count();
+            assert!(n >= 10, "expected a curated {lang} slice, got {n}");
         }
     }
 
@@ -216,23 +256,63 @@ mod tests {
 
     // ── search_directory ──────────────────────────────────────────────
 
+    /// Count of directory entries in one primary-language slice.
+    fn lang_count(lang: &str) -> usize {
+        directory()
+            .iter()
+            .filter(|e| primary_lang(&e.lang) == lang)
+            .count()
+    }
+
     #[test]
-    fn empty_query_returns_whole_directory() {
-        assert_eq!(search_directory("").len(), directory().len());
-        assert_eq!(search_directory("   ").len(), directory().len());
+    fn empty_query_returns_whole_language_slice() {
+        assert_eq!(search_directory("", "en").len(), lang_count("en"));
+        assert_eq!(search_directory("   ", "en").len(), lang_count("en"));
+        assert_eq!(search_directory("", "zh").len(), lang_count("zh"));
+    }
+
+    #[test]
+    fn search_is_scoped_to_the_requested_language() {
+        // A zh query never leaks English feeds and vice versa.
+        let zh = search_directory("", "zh");
+        assert!(!zh.is_empty());
+        assert!(zh.iter().all(|r| r.from_directory));
+        let en_titles: std::collections::HashSet<_> =
+            search_directory("", "en").into_iter().map(|r| r.title).collect();
+        assert!(
+            zh.iter().all(|r| !en_titles.contains(&r.title)),
+            "zh slice must not contain English feeds"
+        );
+    }
+
+    #[test]
+    fn unknown_language_falls_back_to_english() {
+        // A locale we have not curated (Korean here) still gets a usable list.
+        assert_eq!(
+            search_directory("", "ko").len(),
+            search_directory("", "en").len()
+        );
+    }
+
+    #[test]
+    fn primary_subtag_is_matched() {
+        // "zh-CN" / "ZH" must resolve to the same slice as "zh".
+        let base = search_directory("", "zh").len();
+        assert_eq!(search_directory("", "zh-CN").len(), base);
+        assert_eq!(search_directory("", "ZH").len(), base);
     }
 
     #[test]
     fn search_matches_title_case_insensitively() {
-        let hits = search_directory("hacker news");
+        let hits = search_directory("hacker news", "en");
         assert!(hits.iter().any(|r| r.title == "Hacker News"));
-        let upper = search_directory("HACKER NEWS");
+        let upper = search_directory("HACKER NEWS", "en");
         assert_eq!(hits.len(), upper.len());
     }
 
     #[test]
     fn search_matches_category() {
-        let hits = search_directory("science");
+        let hits = search_directory("science", "en");
         assert!(hits.len() >= 3, "expected several Science feeds");
         assert!(hits.iter().all(|r| r.from_directory));
         // The category match must surface every entry filed under Science.
@@ -253,18 +333,18 @@ mod tests {
     #[test]
     fn search_matches_description() {
         // "astronomy" appears only in a description, not a title/category.
-        let hits = search_directory("astronomy");
+        let hits = search_directory("astronomy", "en");
         assert!(!hits.is_empty());
     }
 
     #[test]
     fn search_no_match_returns_empty() {
-        assert!(search_directory("zzz-no-such-feed-xyz").is_empty());
+        assert!(search_directory("zzz-no-such-feed-xyz", "en").is_empty());
     }
 
     #[test]
     fn search_results_carry_directory_metadata() {
-        let hits = search_directory("Rust Blog");
+        let hits = search_directory("Rust Blog", "en");
         let r = hits.first().expect("expected a Rust Blog hit");
         assert!(r.from_directory);
         assert!(r.site_url.is_some());

@@ -36,7 +36,7 @@ function parsePort(raw: string): number {
 
 /** Subscribe to a new source — feed URL or an IMAP newsletter mailbox. */
 export default function AddFeedDialog({ onClose, onToast, initialUrl }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const actions = useArticleActions();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef);
@@ -68,8 +68,8 @@ export default function AddFeedDialog({ onClose, onToast, initialUrl }: Props) {
   }, [url]);
 
   const discovery = useQuery({
-    queryKey: ["discover", debounced],
-    queryFn: () => api.searchFeedDirectory(debounced),
+    queryKey: ["discover", debounced, i18n.language],
+    queryFn: () => api.searchFeedDirectory(debounced, i18n.language),
     // Only search once there's a meaningful query; the scrape can be slow.
     enabled: tab === "feed" && debounced.length >= 2,
     staleTime: 60_000,

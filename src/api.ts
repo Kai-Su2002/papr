@@ -36,9 +36,13 @@ export const deleteFolder = (id: number) =>
 export const listFeeds = () => invoke<Feed[]>("list_feeds");
 export const addFeed = (url: string, folderId: number | null) =>
   invoke<Feed>("add_feed", { url, folderId });
-/** Discover feeds matching a query — curated directory + live page scrape. */
-export const searchFeedDirectory = (query: string) =>
-  invoke<DiscoveryResult[]>("search_feed_directory", { query });
+/**
+ * Discover feeds matching a query — curated directory + live page scrape.
+ * `lang` is the UI language; the curated directory is scoped to it so the
+ * recommendations are in a language the user reads.
+ */
+export const searchFeedDirectory = (query: string, lang: string) =>
+  invoke<DiscoveryResult[]>("search_feed_directory", { query, lang });
 export const deleteFeed = (id: number) => invoke<void>("delete_feed", { id });
 export const moveFeed = (id: number, folderId: number | null) =>
   invoke<void>("move_feed", { id, folderId });

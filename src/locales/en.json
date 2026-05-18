@@ -76,6 +76,24 @@
     "discoverFromPage": "Found on this page",
     "discoverAdd": "Add"
   },
+  "explore": {
+    "title": "Explore feeds",
+    "subtitle": "Browse a curated directory of well-known feeds.",
+    "feedCount": "{{n}} curated feeds — pick a category, then subscribe.",
+    "searchPlaceholder": "Search the directory…",
+    "searchLabel": "Search the feed directory",
+    "categories": "Categories",
+    "all": "All",
+    "add": "Add",
+    "adding": "Adding…",
+    "subscribed": "Subscribed",
+    "subscribedToast": "Subscribed to {{title}}",
+    "loading": "Loading the directory…",
+    "error": "Couldn't load the directory — try again.",
+    "noResults": "Nothing matches — try another keyword or category.",
+    "folderLabel": "Folder for new subscriptions",
+    "noFolder": "No folder"
+  },
   "app": {
     "refreshing": "Refreshing all feeds…",
     "foundNew": "Found {{count}} new articles",
@@ -493,7 +511,7 @@
     "deleteFolder": "Delete folder",
     "addFeedShortcut": "Add feed (A)",
     "refreshAll": "Refresh all (⌘R)",
-    "opmlImportExport": "OPML import / export",
+    "explore": "Explore feeds",
     "settings": "Settings (⌘,)",
     "toastMoved": "Moved {{feed}} → {{folder}}",
     "toastMovedTo": "Moved to {{folder}}",

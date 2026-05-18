@@ -14,6 +14,8 @@ import PromptDialog from "./PromptDialog";
 
 interface Props {
   onAddFeed: () => void;
+  /** Opens the Add-feed dialog on its Explore tab. */
+  onExplore: () => void;
   onOpenSettings: (section?: string) => void;
   onSearchClick: () => void;
   onRefresh: () => void;
@@ -78,6 +80,7 @@ function SbItem({
 
 export default function Sidebar({
   onAddFeed,
+  onExplore,
   onOpenSettings,
   onSearchClick,
   onRefresh,
@@ -668,11 +671,11 @@ export default function Sidebar({
           <Icon name="refresh" size={14} />
         </button>
         <button
-          title={t("sidebar.opmlImportExport")}
-          aria-label={t("sidebar.opmlImportExport")}
-          onClick={() => onOpenSettings("subscriptions")}
+          title={t("sidebar.explore")}
+          aria-label={t("sidebar.explore")}
+          onClick={onExplore}
         >
-          <Icon name="open" size={14} />
+          <Icon name="globe" size={14} />
         </button>
         <div className="spacer" />
         <button

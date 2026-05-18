@@ -147,9 +147,7 @@ pub async fn add_feed(
     if let Some(fav) = &favicon {
         db::update_feed_meta(&conn, feed_id, None, None, None, Some(fav))?;
     }
-    let dedup = db::get_setting(&conn, "dedup_enabled")?
-        .map(|v| v == "1")
-        .unwrap_or(false);
+    let dedup = db::setting_flag(&conn, "dedup_enabled", false);
     let rules = db::active_rules(&conn).unwrap_or_default();
     for article in &parsed.articles {
         db::upsert_article(&conn, feed_id, article, dedup, &rules)?;
@@ -187,10 +185,12 @@ pub async fn add_feed(
 }
 
 /// Feed discovery (feature F6). Searches the bundled curated directory for
-/// entries matching `query`. When `query` looks like a URL or bare domain we
-/// ALSO fetch that page and run `parse::discover_feeds` over it, so the same
-/// box doubles as smart URL handling. Live page-scrape results are returned
-/// first (most specific to what the user typed), then the directory matches.
+/// entries matching `query`, scoped to `lang` (the user's UI language) so the
+/// recommendations are in a language they read. When `query` looks like a URL
+/// or bare domain we ALSO fetch that page and run `parse::discover_feeds` over
+/// it, so the same box doubles as smart URL handling. Live page-scrape results
+/// are returned first (most specific to what the user typed), then the
+/// directory matches.
 ///
 /// A failed page fetch is non-fatal — the directory results are still
 /// returned — so a typo or an offline site does not break discovery.
@@ -198,6 +198,7 @@ pub async fn add_feed(
 pub async fn search_feed_directory(
     state: State<'_, AppState>,
     query: String,
+    lang: String,
 ) -> AppResult<Vec<DiscoveryResult>> {
     let mut results: Vec<DiscoveryResult> = Vec::new();
 
@@ -221,8 +222,9 @@ pub async fn search_feed_directory(
         }
     }
 
-    // Curated directory matches (deduplicated against the scrape results).
-    for hit in discovery::search_directory(&query) {
+    // Curated directory matches (deduplicated against the scrape results),
+    // scoped to the user's UI language so the recommendations read natively.
+    for hit in discovery::search_directory(&query, &lang) {
         if !results.iter().any(|r| r.feed_url == hit.feed_url) {
             results.push(hit);
         }
@@ -299,6 +301,13 @@ fn enqueue_if_connected(conn: &rusqlite::Connection, id: i64, field: &str, value
     }
 }
 
+/// Refresh the two unread surfaces — the Dock badge and the menu-bar tray —
+/// after an operation that changed the unread count.
+async fn refresh_unread_surfaces(app: &AppHandle) {
+    crate::notify::update_badge(app).await;
+    crate::tray::refresh(app).await;
+}
+
 #[tauri::command]
 pub async fn mark_read(app: AppHandle, id: i64, read: bool) -> AppResult<()> {
     {
@@ -307,11 +316,7 @@ pub async fn mark_read(app: AppHandle, id: i64, read: bool) -> AppResult<()> {
         db::set_read(&conn, id, read)?;
         enqueue_if_connected(&conn, id, "read", read);
     }
-    // Marking one article read changes the unread count, so both unread
-    // surfaces must be refreshed: the Dock badge and the tray (its menu-bar
-    // count and "N unread" status line).
-    crate::notify::update_badge(&app).await;
-    crate::tray::refresh(&app).await;
+    refresh_unread_surfaces(&app).await;
     Ok(())
 }
 
@@ -338,8 +343,7 @@ pub async fn mark_all_read(app: AppHandle, query: ArticleQuery) -> AppResult<usi
         db::mark_all_read(&conn, &query, db::is_freshrss_connected(&conn))?
     };
     let _ = app.emit("feeds-updated", 0);
-    crate::notify::update_badge(&app).await;
-    crate::tray::refresh(&app).await;
+    refresh_unread_surfaces(&app).await;
     Ok(n)
 }
 
@@ -666,8 +670,7 @@ pub async fn clear_all_data(app: AppHandle) -> AppResult<()> {
         db::clear_all_data(&conn)?;
     }
     let _ = app.emit("feeds-updated", 0);
-    crate::notify::update_badge(&app).await;
-    crate::tray::refresh(&app).await;
+    refresh_unread_surfaces(&app).await;
     Ok(())
 }
 
@@ -724,8 +727,7 @@ pub async fn freshrss_status(app: AppHandle) -> AppResult<FreshRssStatus> {
 pub async fn freshrss_sync(app: AppHandle) -> AppResult<usize> {
     let n = crate::sync::sync_now(&app).await?;
     let _ = app.emit("feeds-updated", 0);
-    crate::notify::update_badge(&app).await;
-    crate::tray::refresh(&app).await;
+    refresh_unread_surfaces(&app).await;
     Ok(n)
 }
 
@@ -1113,6 +1115,18 @@ pub async fn delete_highlight(state: State<'_, AppState>, id: i64) -> AppResult<
 
 // ─────────────────────────── highlight export (F7) ───────────────────────────
 
+/// Read a required, non-empty setting, returning the localisable `missing`
+/// error code when the key is absent or holds only whitespace.
+fn require_setting(
+    conn: &rusqlite::Connection,
+    key: &str,
+    missing: &'static str,
+) -> AppResult<String> {
+    db::get_setting(conn, key)?
+        .filter(|v| !v.trim().is_empty())
+        .ok_or_else(|| AppError::code(missing))
+}
+
 /// Gather an article and its highlights from the database for export.
 fn load_for_export(
     conn: &rusqlite::Connection,
@@ -1159,9 +1173,7 @@ pub async fn export_highlights_to_obsidian(
     let (markdown, vault, title) = {
         let conn = state.read().await;
         let (article, highlights) = load_for_export(&conn, article_id)?;
-        let vault = db::get_setting(&conn, "obsidian_vault")?
-            .filter(|v| !v.trim().is_empty())
-            .ok_or_else(|| AppError::code("noObsidianVault"))?;
+        let vault = require_setting(&conn, "obsidian_vault", "noObsidianVault")?;
         let markdown = export::build_markdown(&article, &highlights);
         (markdown, vault, article.title)
     };
@@ -1185,9 +1197,7 @@ pub async fn export_highlights_to_readwise(
     let (article, highlights, token) = {
         let conn = state.read().await;
         let (article, highlights) = load_for_export(&conn, article_id)?;
-        let token = db::get_setting(&conn, "readwise_token")?
-            .filter(|t| !t.trim().is_empty())
-            .ok_or_else(|| AppError::code("noReadwiseToken"))?;
+        let token = require_setting(&conn, "readwise_token", "noReadwiseToken")?;
         (article, highlights, token)
     };
     if highlights.is_empty() {
@@ -1209,12 +1219,8 @@ pub async fn export_highlights_to_notion(
     let (article, highlights, token, page) = {
         let conn = state.read().await;
         let (article, highlights) = load_for_export(&conn, article_id)?;
-        let token = db::get_setting(&conn, "notion_token")?
-            .filter(|t| !t.trim().is_empty())
-            .ok_or_else(|| AppError::code("noNotionToken"))?;
-        let page = db::get_setting(&conn, "notion_page")?
-            .filter(|p| !p.trim().is_empty())
-            .ok_or_else(|| AppError::code("noNotionPage"))?;
+        let token = require_setting(&conn, "notion_token", "noNotionToken")?;
+        let page = require_setting(&conn, "notion_page", "noNotionPage")?;
         (article, highlights, token, page)
     };
     if highlights.is_empty() {
@@ -1351,12 +1357,9 @@ pub async fn send_article(
             let (article, key, token) = {
                 let conn = state.read().await;
                 let article = load_for_share(&conn, article_id)?;
-                let key = db::get_setting(&conn, "pocket_consumer_key")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noPocketConfig"))?;
-                let token = db::get_setting(&conn, "pocket_access_token")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noPocketConfig"))?;
+                let key = require_setting(&conn, "pocket_consumer_key", "noPocketConfig")?;
+                let token =
+                    require_setting(&conn, "pocket_access_token", "noPocketConfig")?;
                 (article, key, token)
             };
             let http = state.http();
@@ -1366,12 +1369,10 @@ pub async fn send_article(
             let (article, user, pass) = {
                 let conn = state.read().await;
                 let article = load_for_share(&conn, article_id)?;
-                let user = db::get_setting(&conn, "instapaper_username")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noInstapaperConfig"))?;
-                let pass = db::get_setting(&conn, "instapaper_password")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noInstapaperConfig"))?;
+                let user =
+                    require_setting(&conn, "instapaper_username", "noInstapaperConfig")?;
+                let pass =
+                    require_setting(&conn, "instapaper_password", "noInstapaperConfig")?;
                 (article, user, pass)
             };
             let http = state.http();
@@ -1408,12 +1409,8 @@ pub async fn send_article(
                     feed_title: article.feed_title,
                     published_at: article.published_at,
                 };
-                let token = db::get_setting(&conn, "notion_token")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noNotionToken"))?;
-                let page = db::get_setting(&conn, "notion_page")?
-                    .filter(|v| !v.trim().is_empty())
-                    .ok_or_else(|| AppError::code("noNotionPage"))?;
+                let token = require_setting(&conn, "notion_token", "noNotionToken")?;
+                let page = require_setting(&conn, "notion_page", "noNotionPage")?;
                 (export_article, body_text, token, page)
             };
             let http = state.http();

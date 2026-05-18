@@ -76,6 +76,24 @@
     "discoverFromPage": "このページで見つかったフィード",
     "discoverAdd": "追加"
   },
+  "explore": {
+    "title": "フィードを見つける",
+    "subtitle": "厳選された有名フィードのディレクトリを閲覧します。",
+    "feedCount": "{{n}} 件の厳選フィード — カテゴリを選んで購読します。",
+    "searchPlaceholder": "ディレクトリを検索…",
+    "searchLabel": "フィードディレクトリを検索",
+    "categories": "カテゴリ",
+    "all": "すべて",
+    "add": "追加",
+    "adding": "追加中…",
+    "subscribed": "購読済み",
+    "subscribedToast": "{{title}} を購読しました",
+    "loading": "ディレクトリを読み込み中…",
+    "error": "ディレクトリを読み込めませんでした — 再試行してください。",
+    "noResults": "一致する項目がありません — 別のキーワードかカテゴリをお試しください。",
+    "folderLabel": "新しい購読を入れるフォルダ",
+    "noFolder": "フォルダなし"
+  },
   "app": {
     "refreshing": "すべてのフィードを更新中…",
     "foundNew": "新着記事 {{count}} 件",
@@ -493,7 +511,7 @@
     "deleteFolder": "フォルダを削除",
     "addFeedShortcut": "フィードを追加 (A)",
     "refreshAll": "すべて更新 (⌘R)",
-    "opmlImportExport": "OPML インポート / エクスポート",
+    "explore": "フィードを見つける",
     "settings": "設定 (⌘,)",
     "toastMoved": "{{feed}} を {{folder}} へ移動しました",
     "toastMovedTo": "{{folder}} へ移動しました",
