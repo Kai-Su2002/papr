@@ -988,7 +988,7 @@ pub async fn add_newsletter_source(
     // `last_fetched_at` stays NULL and the sidebar reads it as "never
     // refreshed" until the next scheduler tick (up to the refresh interval
     // away). Mirrors `touch_feed` in `scheduler::poll_newsletters` for the
-    // background poll, and the same fix iteration 189 applied to `add_feed`.
+    // background poll, and the same handling `add_feed` applies.
     let _ = db::touch_feed(&conn, feed_id);
     let last_fetched_at = db::feed_last_fetched(&conn, feed_id).ok().flatten();
     drop(conn);
@@ -1440,19 +1440,14 @@ pub async fn send_article(
         ShareTarget::Notion => {
             let (export_article, body_text, token, page) = {
                 let conn = state.read().await;
-                let detail = db::get_article(&conn, article_id)?;
-                let body_html = detail
-                    .extracted_html
-                    .clone()
-                    .filter(|h| !h.trim().is_empty())
-                    .or_else(|| detail.content_html.clone())
-                    .unwrap_or_default();
+                let article = load_for_share(&conn, article_id)?;
+                let body_text = html_to_text(&article.body_html);
                 let export_article = ExportArticle {
-                    title: detail.title,
-                    url: detail.url,
-                    author: detail.author,
-                    feed_title: detail.feed_title,
-                    published_at: detail.published_at,
+                    title: article.title,
+                    url: article.url,
+                    author: article.author,
+                    feed_title: article.feed_title,
+                    published_at: article.published_at,
                 };
                 let token = db::get_setting(&conn, "notion_token")?
                     .filter(|v| !v.trim().is_empty())
@@ -1460,7 +1455,7 @@ pub async fn send_article(
                 let page = db::get_setting(&conn, "notion_page")?
                     .filter(|v| !v.trim().is_empty())
                     .ok_or_else(|| AppError::code("noNotionPage"))?;
-                (export_article, html_to_text(&body_html), token, page)
+                (export_article, body_text, token, page)
             };
             let http = state.http();
             export::post_article_to_notion(

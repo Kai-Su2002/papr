@@ -115,7 +115,7 @@ pub fn email_to_article(raw: &[u8]) -> Option<ParsedEmail> {
         // Plain-text newsletter: preserve its line breaks by wrapping the
         // (HTML-escaped) text in a <pre> block.
         let text = text.trim().to_string();
-        let escaped = html_escape(&text);
+        let escaped = sanitize::escape_html(&text);
         (Some(format!("<pre>{escaped}</pre>")), text)
     } else {
         (None, String::new())
@@ -191,13 +191,6 @@ pub fn email_to_article(raw: &[u8]) -> Option<ParsedEmail> {
         from_addr,
         article,
     })
-}
-
-/// Minimal HTML escaping for wrapping a plain-text mail body in `<pre>`.
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
 }
 
 /// A deterministic 64-bit hash, used to synthesize a guid for an email that

@@ -1,10 +1,7 @@
-// Keyboard support for floating `role="menu"` popovers.
-//
-// `ContextMenu` already implements this inline; the share / highlight-export
-// popovers (`SendToMenu`, `ExportMenu`) were added later and shipped without
-// it — opening them with the keyboard left focus nowhere, arrow keys did
-// nothing, and closing dropped focus to `<body>`. This hook factors the
-// behaviour out so those menus get parity with `ContextMenu`:
+// Keyboard support for floating `role="menu"` popovers, shared by every menu
+// in the app (`ContextMenu`, `SendToMenu`, `ExportMenu`). Without it, opening
+// a menu with the keyboard left focus nowhere, arrow keys did nothing, and
+// closing dropped focus to `<body>`. The hook:
 //   - moves focus to the first enabled `[role="menuitem"]` on open,
 //   - restores focus to the trigger element on close,
 //   - returns an `onKeyDown` handler for Arrow / Home / End navigation

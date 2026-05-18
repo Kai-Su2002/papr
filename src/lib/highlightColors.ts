@@ -21,15 +21,7 @@ export const HIGHLIGHT_COLORS: HighlightColor[] = [
   { key: "purple", bg: "oklch(0.89 0.10 305 / 0.55)", swatch: "oklch(0.80 0.14 305)" },
 ];
 
-/** The colour applied to a brand-new highlight when none is picked. */
-export const DEFAULT_HIGHLIGHT_COLOR = "yellow";
-
 /** Resolve a stored highlight colour key to its background wash. */
 export function highlightBg(key: string): string {
   return (HIGHLIGHT_COLORS.find((c) => c.key === key) ?? HIGHLIGHT_COLORS[0]).bg;
-}
-
-/** Resolve a stored highlight colour key to its swatch colour. */
-export function highlightSwatch(key: string): string {
-  return (HIGHLIGHT_COLORS.find((c) => c.key === key) ?? HIGHLIGHT_COLORS[0]).swatch;
 }

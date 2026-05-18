@@ -7,8 +7,20 @@
 
 use crate::error::{AppError, AppResult};
 use crate::models::Highlight;
-use reqwest::Client;
+use reqwest::{Client, Response};
 use serde_json::{json, Value};
+
+/// Map a non-success HTTP response to an `AppError` that names the service and
+/// carries the response body; returns the response unchanged on success so a
+/// caller can keep reading it.
+async fn ensure_success(resp: Response, service: &str) -> AppResult<Response> {
+    if resp.status().is_success() {
+        return Ok(resp);
+    }
+    let status = resp.status();
+    let detail = resp.text().await.unwrap_or_default();
+    Err(AppError::other(format!("{service} error {status}: {detail}")))
+}
 
 /// The article fields an export needs. A small owned struct so the builders
 /// stay pure — they never touch the database.
@@ -156,11 +168,7 @@ pub async fn post_to_readwise(
         .json(&body)
         .send()
         .await?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let detail = resp.text().await.unwrap_or_default();
-        return Err(AppError::other(format!("Readwise error {status}: {detail}")));
-    }
+    ensure_success(resp, "Readwise").await?;
     Ok(())
 }
 
@@ -281,11 +289,7 @@ async fn append_notion_children(
         .json(&json!({ "children": children }))
         .send()
         .await?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let detail = resp.text().await.unwrap_or_default();
-        return Err(AppError::other(format!("Notion error {status}: {detail}")));
-    }
+    ensure_success(resp, "Notion").await?;
     Ok(())
 }
 
@@ -434,11 +438,7 @@ pub async fn post_article_to_notion(
         .json(&body)
         .send()
         .await?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let detail = resp.text().await.unwrap_or_default();
-        return Err(AppError::other(format!("Notion error {status}: {detail}")));
-    }
+    let resp = ensure_success(resp, "Notion").await?;
 
     // Append any blocks that did not fit in the create request. The overflow
     // is everything past the first NOTION_MAX_CHILDREN children.

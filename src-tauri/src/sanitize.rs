@@ -78,12 +78,29 @@ pub fn html_to_text(html: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// HTML-escape a string for safe interpolation into element text or an
+/// attribute value. Escapes the five characters that can break out of either
+/// context (`& < > " '`).
+pub fn escape_html(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // --- html_to_text: the six behaviours iteration 115 fixed by hand but
-    //     never pinned with a regression test. ---
+    // --- html_to_text behaviours, each pinned with a regression test. ---
 
     #[test]
     fn block_boundaries_keep_words_apart() {

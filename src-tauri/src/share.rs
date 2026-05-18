@@ -9,6 +9,7 @@
 //! mirrors the structure of `export.rs`.
 
 use crate::error::{AppError, AppResult};
+use crate::sanitize::escape_html;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Message, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
@@ -162,22 +163,6 @@ pub async fn post_to_instapaper(
 }
 
 // ─────────────────────────── Kindle ───────────────────────────
-
-/// HTML-escape a string for safe interpolation into element text / attributes.
-fn escape_html(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            _ => out.push(c),
-        }
-    }
-    out
-}
 
 /// Build a clean, self-contained HTML document for an article — title, byline
 /// and body — suitable for emailing to a `@kindle.com` address. The body HTML

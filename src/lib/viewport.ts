@@ -8,10 +8,10 @@
 // and the overlay is shoved off the *top/left* corner instead — clipping its
 // first items with no way to reach them.
 //
-// This bug was independently rediscovered and re-fixed five times across the
-// codebase (iterations 139, 156, 161, 194, 196) because each new overlay
-// reimplemented the clamp inline. Centralising it here means a new overlay
-// gets the correct two-sided clamp for free.
+// This bug was independently rediscovered and re-fixed several times across
+// the codebase because each new overlay reimplemented the clamp inline.
+// Centralising it here means a new overlay gets the correct two-sided clamp
+// for free.
 //
 // The correct order is: first pull back from the far edge, then floor at the
 // near margin. The floor wins, so an oversized overlay is pinned to the

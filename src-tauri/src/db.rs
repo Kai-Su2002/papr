@@ -616,7 +616,7 @@ pub fn move_feed(conn: &Connection, id: i64, folder_id: Option<i64>) -> AppResul
 /// back to the feed document's own `<title>`.
 pub fn rename_feed(conn: &Connection, id: i64, title: &str) -> AppResult<()> {
     // Reject an empty/whitespace-only title at the chokepoint. A rename also
-    // sets `custom_title = 1` (iteration 178), which makes `update_feed_meta`
+    // sets `custom_title = 1`, which makes `update_feed_meta`
     // never again overwrite the title from the feed document — so an empty
     // title would leave the feed *permanently* blank in the sidebar with no
     // recovery path, not even a refresh. The frontend `PromptDialog` guards
@@ -809,7 +809,7 @@ fn rule_matches(rule: &Rule, feed_id: i64, a: &NewArticle) -> bool {
 /// An article inserted but pre-marked read by a `read` rule returns `false`:
 /// the row landed, but it never shows up as unread, so counting it would
 /// inflate the "N new articles" figure and disagree with the sidebar's unread
-/// count (the same overcount iteration 179 fixed for `add_feed`).
+/// count (the same overcount `add_feed` guards against).
 ///
 /// When `dedup` is on, an article whose URL already exists (in any feed) is
 /// skipped — collapsing the same story pushed by multiple feeds. Enabled

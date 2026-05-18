@@ -21,6 +21,10 @@ use tokio::task::JoinSet;
 /// either.
 pub const NEWSLETTER_POLL_TIMEOUT_SECS: u64 = 90;
 
+/// Result of polling one newsletter mailbox: the feed id paired with either
+/// the raw RFC822 message bytes or an error string describing the failure.
+type MailboxPoll = (i64, Result<Vec<Vec<u8>>, String>);
+
 /// Outcome of fetching one feed.
 enum Outcome {
     NotModified,
@@ -286,29 +290,45 @@ async fn poll_newsletters(
         return 0;
     }
 
-    let mut total_new = 0usize;
+    // Poll the mailboxes concurrently — each IMAP fetch is slow and fully
+    // independent, so serialising them made a refresh stall for the sum of
+    // every mailbox's fetch time. Bounded by a semaphore (mirroring the RSS
+    // path) so a user with many newsletters does not open dozens of TLS
+    // connections at once.
+    let sem = Arc::new(Semaphore::new(4));
+    let mut set: JoinSet<MailboxPoll> = JoinSet::new();
     for (feed_id, cfg) in sources {
-        // `imap` is a blocking crate with no per-operation timeout: a server
-        // that completes the TCP/TLS handshake but then stalls mid-command
-        // would block this poll forever. Because mailboxes are polled
-        // sequentially, one stuck mailbox would also starve every later one
-        // and prevent `refresh_all` from ever finishing (no `feeds-updated`,
-        // no notification, scheduler wedged). Bound the whole fetch with a
-        // wall-clock timeout so a hung mailbox degrades to a per-feed error.
-        let fetched = match tokio::time::timeout(
-            Duration::from_secs(NEWSLETTER_POLL_TIMEOUT_SECS),
-            tokio::task::spawn_blocking(move || newsletter::fetch_recent(&cfg, 50)),
-        )
-        .await
-        {
-            Ok(joined) => joined
-                .map_err(|e| e.to_string())
-                .and_then(|r| r.map_err(|e| e.to_string())),
-            Err(_) => Err(format!(
-                "IMAP poll timed out after {NEWSLETTER_POLL_TIMEOUT_SECS}s"
-            )),
-        };
+        let sem = sem.clone();
+        set.spawn(async move {
+            let _permit = sem.acquire().await;
+            // `imap` is a blocking crate with no per-operation timeout: a
+            // server that completes the TCP/TLS handshake but then stalls
+            // mid-command would block this task forever, holding its permit
+            // and never letting `join_next` complete. Bound the whole fetch
+            // with a wall-clock timeout so a hung mailbox degrades to a
+            // per-feed error instead of wedging the refresh.
+            let fetched = match tokio::time::timeout(
+                Duration::from_secs(NEWSLETTER_POLL_TIMEOUT_SECS),
+                tokio::task::spawn_blocking(move || newsletter::fetch_recent(&cfg, 50)),
+            )
+            .await
+            {
+                Ok(joined) => joined
+                    .map_err(|e| e.to_string())
+                    .and_then(|r| r.map_err(|e| e.to_string())),
+                Err(_) => Err(format!(
+                    "IMAP poll timed out after {NEWSLETTER_POLL_TIMEOUT_SECS}s"
+                )),
+            };
+            (feed_id, fetched)
+        });
+    }
 
+    let mut total_new = 0usize;
+    while let Some(joined) = set.join_next().await {
+        let Ok((feed_id, fetched)) = joined else {
+            continue;
+        };
         match fetched {
             Ok(messages) => {
                 // Parse the RFC822 bytes into articles *before* taking the DB

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Icon, { type IconName } from "./Icon";
 import { clampToViewport } from "../lib/viewport";
+import { useMenuKeyboard } from "../hooks/useMenuKeyboard";
 
 export type MenuEntry =
   | {
@@ -56,47 +57,9 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     };
   }, [onClose]);
 
-  // Move keyboard focus into the menu on open and restore it to whatever was
-  // focused (the right-clicked row) when the menu closes.
-  useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    return () => trigger?.focus?.();
-  }, []);
-
-  /** Arrow / Home / End / Enter navigation over the menu items. */
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    const menuitems = Array.from(
-      ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
-    );
-    if (menuitems.length === 0) return;
-    const idx = menuitems.indexOf(document.activeElement as HTMLElement);
-    const focusAt = (i: number) => {
-      e.preventDefault();
-      menuitems[(i + menuitems.length) % menuitems.length]?.focus();
-    };
-    switch (e.key) {
-      case "ArrowDown": focusAt(idx + 1); break;
-      case "ArrowUp": focusAt(idx < 0 ? -1 : idx - 1); break;
-      case "Home": focusAt(0); break;
-      case "End": focusAt(menuitems.length - 1); break;
-      case "Enter":
-      case " ": {
-        // The colour-swatch items are real <button>s, which already fire
-        // `click` on Enter/Space natively. Synthesising another `click()`
-        // here would run `onPick` twice (a double tag-recolour mutation).
-        // The plain `ctx-item` rows are <div>s and *do* need the synthetic
-        // click — so only forward the key to non-natively-activatable
-        // elements, mirroring `useMenuKeyboard`.
-        const el = document.activeElement as HTMLElement | null;
-        if (el && el.tagName !== "BUTTON" && el.tagName !== "A") {
-          e.preventDefault();
-          el.click();
-        }
-        break;
-      }
-    }
-  };
+  // Focus management on open/close plus Arrow/Home/End/Enter navigation,
+  // shared with the other role="menu" popovers.
+  const onKeyDown = useMenuKeyboard(ref);
 
   return (
     <div
