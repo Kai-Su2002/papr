@@ -1169,7 +1169,28 @@ pub fn create_tag(conn: &Connection, name: &str) -> AppResult<i64> {
     Ok(conn.last_insert_rowid())
 }
 
+/// Rename a tag, rejecting a name that collides with a *different* existing
+/// tag.
+///
+/// `tags.name` is `UNIQUE` (case-sensitively). Without this guard a rename to a
+/// name that exactly matches another tag would fail the constraint and surface
+/// the raw SQLite message to the user; and a rename to a *case variant* of
+/// another tag ("rust" → "Rust") would succeed and create the near-duplicate
+/// that `create_tag` deliberately collapses — leaving the two functions
+/// inconsistent. Match case-insensitively, the same basis `create_tag` and
+/// `list_tags`'s ordering use, and return a localisable `tagNameExists` code.
+/// Renaming a tag to its own current name (or a case change of it) is allowed.
 pub fn rename_tag(conn: &Connection, id: i64, name: &str) -> AppResult<()> {
+    let clash: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE AND id != ?2",
+            params![name, id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if clash.is_some() {
+        return Err(AppError::code("tagNameExists"));
+    }
     conn.execute("UPDATE tags SET name = ?2 WHERE id = ?1", params![id, name])?;
     Ok(())
 }
@@ -2510,5 +2531,48 @@ mod tests {
             .query_row("SELECT title FROM feeds WHERE id = ?1", [feed_id], |r| r.get(0))
             .unwrap();
         assert_eq!(title, "Renamed Upstream");
+    }
+
+    #[test]
+    fn rename_tag_rejects_collision_with_another_tag() {
+        let (conn, _aid) = test_db();
+        let rust = create_tag(&conn, "Rust").unwrap();
+        let go = create_tag(&conn, "Go").unwrap();
+
+        // Renaming "Go" onto an exact match of "Rust" must be rejected with the
+        // localisable code rather than the raw UNIQUE-constraint SQLite error.
+        let err = rename_tag(&conn, go, "Rust").unwrap_err();
+        assert!(
+            matches!(err, AppError::Coded("tagNameExists")),
+            "expected tagNameExists, got {err:?}"
+        );
+        // A *case variant* of another tag must be rejected too — otherwise it
+        // would create the near-duplicate `create_tag` deliberately collapses.
+        let err = rename_tag(&conn, go, "rust").unwrap_err();
+        assert!(matches!(err, AppError::Coded("tagNameExists")));
+
+        // The clash check did not corrupt either name.
+        let name = |id| {
+            conn.query_row("SELECT name FROM tags WHERE id = ?1", [id], |r| {
+                r.get::<_, String>(0)
+            })
+            .unwrap()
+        };
+        assert_eq!(name(rust), "Rust");
+        assert_eq!(name(go), "Go");
+    }
+
+    #[test]
+    fn rename_tag_allows_genuine_rename_and_self_case_change() {
+        let (conn, _aid) = test_db();
+        let id = create_tag(&conn, "draft").unwrap();
+        // A free name is accepted.
+        rename_tag(&conn, id, "Reading").unwrap();
+        // Re-casing the tag's *own* name is allowed (no other tag clashes).
+        rename_tag(&conn, id, "READING").unwrap();
+        let name: String = conn
+            .query_row("SELECT name FROM tags WHERE id = ?1", [id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(name, "READING");
     }
 }

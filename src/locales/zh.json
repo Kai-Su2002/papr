@@ -523,6 +523,7 @@
     "unknown": "发生未知错误",
     "noAiKey": "尚未设置 AI API Key，请在「设置 → 高级」中填写",
     "emptyTagName": "标签名称不能为空",
+    "tagNameExists": "已存在同名标签",
     "emptyRuleQuery": "请为规则至少输入一个关键词",
     "noFeedFound": "在该网址未找到可订阅的源",
     "responseTooLarge": "服务器响应过大",

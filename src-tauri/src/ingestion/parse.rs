@@ -167,7 +167,16 @@ fn map_entry(e: &Entry, base: &str) -> Option<NewArticle> {
         .flat_map(|m| m.content.iter())
         .filter_map(|c| {
             let url = c.url.as_ref()?.to_string();
-            let declared = c.content_type.as_ref().map(|t| t.to_string());
+            // `MediaTypeBuf`'s `Display` emits the type/subtype verbatim — it
+            // does not canonicalise case. A feed declaring `type="AUDIO/MPEG"`
+            // would then fail the `starts_with("audio")` test below and have
+            // its episode silently dropped (and the frontend's own
+            // case-sensitive `audio`/`video` filter would miss it too).
+            // Lowercase the declared type so the kind check is case-insensitive.
+            let declared = c
+                .content_type
+                .as_ref()
+                .map(|t| t.to_string().to_ascii_lowercase());
             let mime_type = declared.or_else(|| mime_from_url(&url).map(String::from));
             let is_av = mime_type
                 .as_deref()
@@ -350,5 +359,24 @@ mod tests {
         assert_eq!(mime_from_url("https://example.com/article.html"), None);
         assert_eq!(mime_from_url("https://example.com/feed"), None);
         assert_eq!(mime_from_url("https://example.com/image.jpg"), None);
+    }
+
+    #[test]
+    fn enclosure_with_uppercase_mime_is_kept_and_normalised() {
+        // A podcast feed whose `<enclosure>` declares an upper/mixed-case
+        // `type`. Without case-folding, the audio/video filter would drop the
+        // episode entirely, leaving it unplayable and the feed misclassified.
+        let rss = br#"<?xml version="1.0"?>
+            <rss version="2.0"><channel><title>Pod</title>
+              <item>
+                <title>Ep 1</title>
+                <enclosure url="https://cdn.example.com/ep1.bin"
+                           type="AUDIO/MPEG" length="123" />
+              </item>
+            </channel></rss>"#;
+        let parsed = super::parse_feed(rss, "https://example.com/feed").unwrap();
+        let enc = &parsed.articles[0].enclosures;
+        assert_eq!(enc.len(), 1, "uppercase-typed audio enclosure must survive");
+        assert_eq!(enc[0].mime_type.as_deref(), Some("audio/mpeg"));
     }
 }

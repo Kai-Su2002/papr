@@ -31,18 +31,29 @@ export function feedColor(seed: string | number): string {
  *  through to the latin path and rendered two cramped glyphs instead of one. */
 const CJK_GLYPH = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
 
+/** The first whole code point of a string — `s[0]` would split an
+ *  astral-plane character (a CJK Extension B ideograph, an emoji) into a
+ *  lone surrogate, which renders as a broken `�`. */
+function firstCodePoint(s: string): string {
+  return Array.from(s)[0] ?? "";
+}
+
 /** 1–2 character avatar label: first CJK glyph, or latin initials. */
 export function feedAvatar(title: string): string {
   const t = (title || "").trim();
   if (!t) return "?";
-  // Take the first whole code point — `t[0]` would split an astral-plane
-  // character (a CJK Extension B ideograph, an emoji) into a lone surrogate.
-  const first = Array.from(t)[0];
+  const chars = Array.from(t);
+  const first = chars[0];
   if (CJK_GLYPH.test(first)) return first;
   const words = t.split(/[\s·|—-]+/).filter(Boolean);
-  if (words.length >= 2 && /[a-zA-Z]/.test(words[0][0]))
-    return (words[0][0] + words[1][0]).toUpperCase();
-  return t.slice(0, 2).toUpperCase();
+  // Per-word initials must also be taken by code point: a title like
+  // "News 🚀" would otherwise pair the latin "N" with a lone surrogate from
+  // the emoji's first UTF-16 unit, rendering the avatar as "N�".
+  if (words.length >= 2 && /[a-zA-Z]/.test(firstCodePoint(words[0])))
+    return (firstCodePoint(words[0]) + firstCodePoint(words[1])).toUpperCase();
+  // Last resort: the first two whole code points — `t.slice(0, 2)` would
+  // split an astral-plane character straddling the 2-unit cut.
+  return chars.slice(0, 2).join("").toUpperCase();
 }
 
 /** Bare hostname for the feed, used as a secondary label. */
