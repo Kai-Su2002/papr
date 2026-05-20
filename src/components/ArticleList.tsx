@@ -7,7 +7,7 @@ import * as api from "../api";
 import { useUi } from "../store";
 import { useArticleActions } from "../hooks/articleActions";
 import { feedAvatar, feedColor, relTime } from "../lib/feedMeta";
-import { isMac } from "../lib/platform";
+import { isMac, modCombo } from "../lib/platform";
 import { reportError, toast } from "../toast";
 import { clampToViewport } from "../lib/viewport";
 import type { ArticleSummary, Feed } from "../types";
@@ -180,7 +180,7 @@ export default function ArticleList({ onToast }: Props) {
           {
             icon: "globe",
             label: t("articleList.menuOpenInBrowser"),
-            shortcut: "⌘O",
+            shortcut: modCombo("O"),
             onClick: () => openUrl(a.url!).catch(() => {}),
           },
         ] as MenuEntry[])

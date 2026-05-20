@@ -5,6 +5,14 @@ import "./i18n";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isMac } from "./lib/platform";
+// Bundle the three UI / reader fonts so Windows and Linux render with the
+// same letterforms macOS sees, instead of falling through to Arial / DejaVu.
+// Variable-weight woff2 — one file per family covers every weight the styles
+// reference (450 / 500 / 550 / 600 / 650 / 700).
+import "@fontsource-variable/inter-tight";
+import "@fontsource-variable/jetbrains-mono";
+import "@fontsource-variable/newsreader";
+import "@fontsource-variable/newsreader/wght-italic.css";
 import "./styles.css";
 
 // Tag the document root before first paint so the mac-only titlebar chrome

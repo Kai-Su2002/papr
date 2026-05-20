@@ -5,7 +5,7 @@ import * as api from "../api";
 import { useUi } from "../store";
 import { useArticleActions } from "../hooks/articleActions";
 import { withUndo, reportError } from "../toast";
-import { isMac } from "../lib/platform";
+import { isMac, modCombo } from "../lib/platform";
 import { tagColor, TAG_PALETTE } from "../lib/tagColors";
 import type { ArticleQuery, Feed, Folder, Tag } from "../types";
 import Icon, { type IconName } from "./Icon";
@@ -480,7 +480,7 @@ export default function Sidebar({
       >
         <Icon name="search" size={13} />
         <span>{t("sidebar.searchArticles")}</span>
-        <kbd>⌘K</kbd>
+        <kbd>{modCombo("K")}</kbd>
       </div>
 
       <div className="sidebar-scroll">

@@ -9,6 +9,7 @@ import { useArticleActions } from "../hooks/articleActions";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { LANGUAGES, setLanguage, type Language } from "../i18n";
 import { feedHost } from "../lib/feedMeta";
+import { modKey, modCombo } from "../lib/platform";
 import { reportError } from "../toast";
 import { downloadFile } from "../lib/download";
 import type { Feed, Rule, RuleAction, RuleField, RulePreview } from "../types";
@@ -112,7 +113,7 @@ export default function SettingsDialog({
         <div className="settings-sidebar">
           <div className="settings-sidebar-title">
             {t("settings.title")}
-            <span className="badge">⌘,</span>
+            <span className="badge">{modCombo(",")}</span>
           </div>
           {SECTIONS.map((s) => (
             <div
@@ -1334,10 +1335,10 @@ function ShortcutsSection() {
     {
       title: t("settings.shortcuts.global"),
       items: [
-        { desc: t("settings.shortcuts.commandPalette"), keys: ["⌘", "K"] },
-        { desc: t("settings.shortcuts.refreshAll"), keys: ["⌘", "R"] },
+        { desc: t("settings.shortcuts.commandPalette"), keys: [modKey, "K"] },
+        { desc: t("settings.shortcuts.refreshAll"), keys: [modKey, "R"] },
         { desc: t("settings.shortcuts.addFeed"), keys: ["A"] },
-        { desc: t("settings.shortcuts.openSettings"), keys: ["⌘", ","] },
+        { desc: t("settings.shortcuts.openSettings"), keys: [modKey, ","] },
       ],
     },
   ];
