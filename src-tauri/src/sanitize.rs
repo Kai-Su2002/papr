@@ -4,7 +4,8 @@
 use ammonia::{Builder, UrlRelative};
 use ego_tree::iter::Edge;
 use scraper::node::Node;
-use scraper::Html;
+use scraper::{Html, Selector};
+use std::sync::LazyLock;
 use url::Url;
 
 /// Sanitize untrusted HTML for safe rendering inside the reader webview.
@@ -76,6 +77,23 @@ pub fn html_to_text(html: &str) -> String {
         }
     }
     out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+static IMG_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("img").expect("img is a valid selector"));
+
+/// The first usable image URL embedded in a block of (already-sanitized) HTML.
+/// Used as a card-thumbnail fallback when the feed ships no media thumbnail —
+/// many feeds put the lead image only as an `<img>` in the entry body. Because
+/// `sanitize` has already rewritten relative URLs against the feed base, a
+/// non-absolute `src` left here is unresolvable, and a `data:` blob is an
+/// inline pixel rather than a real thumbnail; both are skipped.
+pub fn first_image(html: &str) -> Option<String> {
+    let frag = Html::parse_fragment(html);
+    frag.select(&IMG_SELECTOR).find_map(|el| {
+        let src = el.value().attr("src")?.trim();
+        (src.starts_with("http://") || src.starts_with("https://")).then(|| src.to_string())
+    })
 }
 
 /// HTML-escape a string for safe interpolation into element text or an
@@ -170,6 +188,30 @@ mod tests {
     fn sanitize_adds_rel_to_links() {
         let out = sanitize("<a href=\"https://example.com\">x</a>", None);
         assert!(out.contains("noopener"), "link rel missing: {out}");
+    }
+
+    // --- first_image: card-thumbnail fallback from body HTML. ---
+
+    #[test]
+    fn first_image_returns_the_first_absolute_img() {
+        let html = r#"<p>intro</p><img src="https://ex.com/a.png"><img src="https://ex.com/b.png">"#;
+        assert_eq!(first_image(html).as_deref(), Some("https://ex.com/a.png"));
+    }
+
+    #[test]
+    fn first_image_skips_unusable_sources() {
+        // A leftover relative src can't resolve (sanitize would have made real
+        // ones absolute); a data: blob is an inline pixel, not a thumbnail.
+        assert_eq!(first_image(r#"<img src="/local.png">"#), None);
+        assert_eq!(first_image(r#"<img src="data:image/png;base64,AAAA">"#), None);
+        assert_eq!(first_image("<p>no images here</p>"), None);
+        assert_eq!(first_image(""), None);
+    }
+
+    #[test]
+    fn first_image_falls_through_relative_to_next_absolute() {
+        let html = r#"<img src="/rel.png"><img src="https://ex.com/real.jpg">"#;
+        assert_eq!(first_image(html).as_deref(), Some("https://ex.com/real.jpg"));
     }
 
     #[test]

@@ -153,6 +153,36 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 notify::update_badge(&badge_handle).await;
             });
+
+            // ── One-time card-thumbnail backfill ──────────────────────
+            // Articles ingested before the body-image fallback have no
+            // thumbnail even when their HTML embeds one. Adopt that first
+            // image once, for existing rows. The HTML parse is heavy, so it
+            // runs on a blocking thread against a throwaway reader; only the
+            // quick UPDATE batch takes the writer lock.
+            let bf_handle = app.handle().clone();
+            let bf_db_path = db_path.clone();
+            tauri::async_runtime::spawn(async move {
+                let updates = tauri::async_runtime::spawn_blocking(move || {
+                    let conn = db::open_reader(&bf_db_path).ok()?;
+                    if db::get_setting(&conn, "card_image_backfill")
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        return None;
+                    }
+                    Some(db::card_image_backfill_scan(&conn).unwrap_or_default())
+                })
+                .await
+                .ok()
+                .flatten();
+                let Some(updates) = updates else { return };
+                let state = bf_handle.state::<AppState>();
+                let conn = state.db.lock().await;
+                let _ = db::apply_card_images(&conn, &updates);
+                let _ = db::set_setting(&conn, "card_image_backfill", "1");
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

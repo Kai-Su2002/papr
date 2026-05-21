@@ -949,6 +949,43 @@ pub fn list_articles(
     Ok(rows)
 }
 
+/// Scan stored articles that have no thumbnail but whose body HTML embeds an
+/// image, returning the `(id, image_url)` pairs to adopt. Reads only — paired
+/// with `apply_card_images` so the caller can run this heavy parse on a reader
+/// connection and the quick writes under the writer lock. One-time: feeds
+/// ingested after the body-image fallback shipped already store this at parse.
+pub fn card_image_backfill_scan(conn: &Connection) -> AppResult<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, content_html FROM articles
+         WHERE image_url IS NULL AND content_html IS NOT NULL AND content_html <> ''",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (id, html) = row?;
+        if let Some(img) = crate::sanitize::first_image(&html) {
+            out.push((id, img));
+        }
+    }
+    Ok(out)
+}
+
+/// Persist the `(id, image_url)` pairs found by `card_image_backfill_scan`,
+/// in a single transaction.
+pub fn apply_card_images(conn: &Connection, updates: &[(i64, String)]) -> AppResult<()> {
+    let tx = conn.unchecked_transaction()?;
+    for (id, img) in updates {
+        tx.execute(
+            "UPDATE articles SET image_url = ?2 WHERE id = ?1",
+            params![id, img],
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 /// Turn raw user text into a safe FTS5 MATCH expression (each term
 /// prefix-matched). `or_join` selects how multiple terms combine: `false`
 /// joins them with an implicit AND (every term must match — explicit search,

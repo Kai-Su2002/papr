@@ -137,26 +137,33 @@ fn map_entry(e: &Entry, base: &str) -> Option<NewArticle> {
         .map(|s| sanitize::html_to_text(&s.content))
         .filter(|s| !s.is_empty());
 
-    // Image: prefer a media thumbnail, then any image-typed media content.
-    let image_url = e.media.iter().find_map(|m| {
-        m.thumbnails
-            .first()
-            .map(|t| t.image.uri.clone())
-            .or_else(|| {
-                m.content.iter().find_map(|c| {
-                    let is_img = c
-                        .content_type
-                        .as_ref()
-                        .map(|t| t.ty().as_str() == "image")
-                        .unwrap_or(false);
-                    if is_img {
-                        c.url.as_ref().map(|u| u.to_string())
-                    } else {
-                        None
-                    }
+    // Image: prefer a media thumbnail, then any image-typed media content,
+    // and finally — for the many feeds that ship no media metadata at all —
+    // the first image embedded in the entry body, so card view still has a
+    // thumbnail to show.
+    let image_url = e
+        .media
+        .iter()
+        .find_map(|m| {
+            m.thumbnails
+                .first()
+                .map(|t| t.image.uri.clone())
+                .or_else(|| {
+                    m.content.iter().find_map(|c| {
+                        let is_img = c
+                            .content_type
+                            .as_ref()
+                            .map(|t| t.ty().as_str() == "image")
+                            .unwrap_or(false);
+                        if is_img {
+                            c.url.as_ref().map(|u| u.to_string())
+                        } else {
+                            None
+                        }
+                    })
                 })
-            })
-    });
+        })
+        .or_else(|| content_html.as_deref().and_then(sanitize::first_image));
 
     // Enclosures: audio/video media content (podcasts, video). Many real-world
     // podcast feeds ship an `<enclosure>` without a `type` attribute, leaving
